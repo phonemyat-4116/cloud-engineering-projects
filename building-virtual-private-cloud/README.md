@@ -1,7 +1,7 @@
 
-# ☁️ AWS VPC Networking Project
+# ☁️ AWS Multi-VPC Networking, Security & Observability
 
-> A hands-on AWS project to learn virtual networking, IP addressing, and network routing.
+> A hands-on AWS project building and testing interconnected network architectures, implementing network security, and monitoring traffic withing infrastructure. 
 
 
 ## 🎯 Objectives
@@ -20,8 +20,6 @@
 ## 🏗️ Architecture
 
 ![AWS VPC Architecture](docs/architecture.png)
-
-*Add an architecture diagram showing your VPC, subnet, Internet Gateway, and routing.*
 
 
 ## ⚙️ Implementation
@@ -149,6 +147,8 @@ Again, when I create a private subnet, there is also Network ACL created as defa
 
 **Note:** The custom network ACLs start with denying all inbound and outbound traffic, but I will leave it for now, and will customize later. 
 
+---
+
 
 ### Step 8: Launch instances in each subnet
 
@@ -161,6 +161,103 @@ After setting up the VPC as above, now it is ready to launch a **public server**
 ✅ I created a separate **security group for the private server**, allowing inbound traffic only from the public subnet because internal communication is required, but outbound traffic to the private server is not.
 
 ![Private Security Group](screenshots/private-security-group.png)
+
+---
+
+
+### Step 9: Connect to Public Server (Testing Starts)
+
+After launching both EC2 instances, I use **EC2 Instance Connect** to establish an SSH connection to my private server directly through **AWS Management Console**.
+
+**Initial Connection Issues**
+
+My first connection attempt failed because my public server's security only allow HTTP port as inboud traffic, not SSH. 
+
+![SSH Connection Issue](screenshots/ssh-connection-issue.png)
+
+
+**As a solution** for this, I updated the inbound rules of my public security group to allow SSH traffic.
+
+![SSH Connection Solved](screenshots/public-sg-update-ssh.png)
+
+*Note: Since this is a testing, SSH access is configured from Anywhere, but in the real-production (which will be in another project), SSH access should be restricted to trusted IP.*
+
+**What I learned:**
+
+- SSH provides encrypted remote acccess to server
+- To use SSH, security group must allow this SSH traffic
+
+---
+
+### Step 10: Test Internal Connectivity Between EC2 Instances
+
+In this section, I tested communication between my public server and private server with **ping** command.
+
+```bash
+ping 10.0.1.170
+```
+
+**Issue here:**
+The ping command did not recieve any replies because the custom private Network ACL is still denying all inbound and outbound traffic.
+
+![Ping Fail](screenshots/ping-fail-to-private-server.png)
+
+![Private NACL Deny All Trafic](screenshots/private-nacl-deny.png)
+
+
+**As a solution,** I updated the private Nacl to allow ICMP traffic from the public subnet.
+
+*Outbound Rules:*
+
+| Rule Number | Type | Source | Action |
+|---|---|---|---|
+| 100 | All ICMP - IPv4 | `10.0.0.0/24` | Allow |
+
+*Outbound Rules:*
+
+| Rule Number | Type | Destination | Action |
+|---|---|---|---|
+| 100 | All ICMP - IPv4 | `10.0.0.0/24` | Allow |
+
+
+Along with this, I also updated the private server's security group to allow **ICMP traffic** from my public server's security group.
+
+**Testing Result**
+After updating the configuration, I tested the ping command to private server, and successfully received response from server.
+
+![Connection to Private Server Success](screenshots/success-result.png)
+
+
+**What I learned**:
+- *ping* command uses ICMP to test the network connectivity.
+- Both security groups and NACLs must permit the required traffic for successful communication.
+
+---
+
+### Step 11: Test Intenet Connectivity
+
+After successfully tested the internal communication, I moved on to testing whether my public server could access external websites through the Internet Gateway.
+
+I executed the following command.
+
+```bash
+curl example.com
+```
+
+The command successfully reterived the HTML response, which comfirmed my public server could communicate with internet. 
+
+![Curl Success](screenshots/curl-success.png)
+
+**Learning Note**
+Both command test the connectivity, but in details,
+
+- *ping*: Check one computer can connect another
+- *curl*: Used to transfer data to and from a server
+
+---
+
+
+
 
 
 ## 🔧 Challenges & Solutions
